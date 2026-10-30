@@ -1,0 +1,1483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#070b14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>音频声波显示器 · Audio Wave Visualizer</title>
+<style>
+:root{
+  --bg1:#05080f; --bg2:#0c1322; --bg3:#111a2e;
+  --card:rgba(255,255,255,.045);
+  --line:rgba(255,255,255,.09);
+  --txt:#e8eefc; --dim:#8b9ab8; --dim2:#5d6b87;
+  --c1:#22d3ee; --c2:#a78bfa; --c3:#f472b6; --ok:#34d399; --warn:#fbbf24; --bad:#fb7185;
+  --r:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+html,body{margin:0;padding:0}
+body{
+  font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  color:var(--txt);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #16233d 0%, transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, #2a1740 0%, transparent 55%),
+    linear-gradient(180deg,var(--bg1),var(--bg2) 40%,#070c16 100%);
+  background-attachment:fixed;
+  min-height:100vh;
+  padding:14px 14px calc(34px + env(safe-area-inset-bottom));
+  font-size:14px;line-height:1.5;
+  -webkit-user-select:none;user-select:none;
+  overscroll-behavior-y:none;
+}
+.wrap{max-width:1000px;margin:0 auto}
+
+/* ---------- header ---------- */
+header{display:flex;align-items:center;gap:12px;margin:4px 0 12px}
+.logo{
+  width:44px;height:44px;border-radius:13px;flex:none;
+  background:linear-gradient(135deg,var(--c1),var(--c2) 55%,var(--c3));
+  display:grid;place-items:center;box-shadow:0 8px 24px rgba(120,80,255,.35);
+}
+.logo svg{width:25px;height:25px}
+h1{font-size:19px;margin:0;letter-spacing:.5px;font-weight:700}
+h1 small{display:block;font-size:11px;font-weight:500;color:var(--dim);letter-spacing:1.2px;margin-top:1px}
+.devbar{
+  margin-left:auto;display:flex;align-items:center;gap:7px;flex:none;
+  padding:7px 11px;border-radius:20px;border:1px solid var(--line);
+  background:rgba(255,255,255,.05);font-size:11.5px;color:var(--dim);max-width:52%;
+}
+.devbar b{color:var(--txt);font-weight:600}
+.devbar svg{width:15px;height:15px;flex:none;opacity:.9}
+
+/* ---------- cards ---------- */
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:14px;margin-bottom:12px;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+.card h2{
+  margin:0 0 10px;font-size:12px;letter-spacing:1.5px;color:var(--dim);
+  text-transform:uppercase;display:flex;align-items:center;gap:8px;font-weight:600;
+}
+.card h2::before{content:"";width:3px;height:12px;border-radius:2px;background:linear-gradient(var(--c1),var(--c2));flex:none}
+.card h2 .more{margin-left:auto;font-size:11px;letter-spacing:0;color:var(--dim2);text-transform:none;cursor:pointer}
+
+/* ---------- mode tabs ---------- */
+.tabs{display:flex;gap:8px;margin-bottom:12px}
+.tab{
+  flex:1;padding:12px 10px;border-radius:12px;border:1px solid var(--line);
+  background:rgba(255,255,255,.03);color:var(--dim);font-size:13.5px;font-weight:600;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;
+  transition:.2s;font-family:inherit;min-height:46px;
+}
+.tab:hover{color:var(--txt);border-color:rgba(255,255,255,.2)}
+.tab.on{
+  color:#04121c;border-color:transparent;
+  background:linear-gradient(135deg,var(--c1),var(--c2));
+  box-shadow:0 6px 18px rgba(60,180,255,.28);
+}
+.tab svg{width:17px;height:17px;flex:none}
+
+/* ---------- dropzone ---------- */
+.drop{
+  position:relative;
+  border:1.5px dashed rgba(255,255,255,.18);border-radius:14px;
+  padding:24px 16px;text-align:center;cursor:pointer;transition:.2s;
+  background:rgba(255,255,255,.02);min-height:118px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+.drop:hover,.drop.over{border-color:var(--c1);background:rgba(34,211,238,.07)}
+.drop .big{font-size:15px;font-weight:600;margin-bottom:5px}
+.drop .sub{font-size:11.5px;color:var(--dim2);line-height:1.65}
+.drop .ico{width:34px;height:34px;margin-bottom:8px;opacity:.85;flex:none}
+#fileInput{
+  position:absolute;left:0;top:0;width:100%;height:100%;
+  opacity:0;cursor:pointer;z-index:6;display:block;
+  border:0;margin:0;padding:0;font-size:0;background:transparent;
+  -webkit-appearance:none;appearance:none;
+}
+.hidden{display:none!important}
+.env{
+  margin-bottom:10px;padding:10px 12px;border-radius:11px;font-size:12.5px;line-height:1.65;
+  background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.32);color:#fde68a;
+}
+.env b{color:#fff}
+.hint{
+  margin-top:9px;padding:9px 12px;border-radius:11px;font-size:12px;line-height:1.6;
+  background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.3);color:#a5f3fc;
+}
+.mini{margin-top:9px;font-size:11.5px;color:var(--dim2)}
+.mini a{color:var(--c1);text-decoration:none;border-bottom:1px dotted rgba(34,211,238,.5);cursor:pointer}
+.err{
+  margin-top:10px;padding:10px 12px;border-radius:11px;font-size:12.5px;line-height:1.6;
+  background:rgba(251,113,133,.12);border:1px solid rgba(251,113,133,.35);color:#fecdd3;
+  -webkit-user-select:text;user-select:text;
+}
+
+/* ---------- stage ---------- */
+.stage{
+  position:relative;border-radius:14px;overflow:hidden;background:#000;
+  border:1px solid var(--line);aspect-ratio:16/9;max-height:340px;
+  display:grid;place-items:center;touch-action:manipulation;
+}
+.stage video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
+.stage .ph{
+  position:absolute;inset:0;display:grid;place-items:center;text-align:center;
+  color:var(--dim2);font-size:12.5px;pointer-events:none;padding:20px;
+}
+.stage .ph .wave{display:flex;gap:4px;align-items:center;justify-content:center;height:52px;margin-bottom:10px}
+.stage .ph .wave i{width:4px;border-radius:3px;background:linear-gradient(var(--c1),var(--c2));height:14px;animation:bounce 1.1s ease-in-out infinite}
+.stage .ph .wave i:nth-child(2){animation-delay:.12s}
+.stage .ph .wave i:nth-child(3){animation-delay:.24s}
+.stage .ph .wave i:nth-child(4){animation-delay:.36s}
+.stage .ph .wave i:nth-child(5){animation-delay:.48s}
+@keyframes bounce{0%,100%{height:12px;opacity:.5}50%{height:48px;opacity:1}}
+.badge{
+  position:absolute;left:10px;top:10px;z-index:2;font-size:11px;font-weight:600;
+  padding:5px 10px;border-radius:20px;background:rgba(0,0,0,.62);backdrop-filter:blur(6px);
+  border:1px solid rgba(255,255,255,.14);letter-spacing:.3px;max-width:calc(100% - 20px);
+}
+.badge.warn{background:rgba(251,191,36,.18);border-color:rgba(251,191,36,.45);color:#fde68a}
+
+/* ---------- controls ---------- */
+.ctrl{display:flex;align-items:center;gap:9px;margin-top:12px;flex-wrap:wrap}
+.btn{
+  border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--txt);
+  width:44px;height:44px;border-radius:12px;display:grid;place-items:center;cursor:pointer;
+  flex:none;transition:.18s;padding:0;font-family:inherit;touch-action:manipulation;
+}
+.btn:hover{background:rgba(255,255,255,.11);border-color:rgba(255,255,255,.25)}
+.btn.play{background:linear-gradient(135deg,var(--c1),var(--c2));border:none;color:#04121c;width:50px;height:50px}
+.btn.on{background:rgba(34,211,238,.16);border-color:var(--c1);color:var(--c1)}
+.btn svg{width:19px;height:19px}
+.btn.play svg{width:22px;height:22px}
+.seek{flex:1;min-width:100%;order:3;display:flex;align-items:center;gap:9px}
+.tm{font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--dim);white-space:nowrap;flex:none}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;height:26px;background:transparent;flex:1;min-width:60px;cursor:pointer;margin:0;
+}
+input[type=range]::-webkit-slider-runnable-track{height:5px;border-radius:5px;background:rgba(255,255,255,.14)}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;
+  margin-top:-6.5px;box-shadow:0 2px 8px rgba(0,0,0,.5);border:none;
+}
+input[type=range]::-moz-range-track{height:5px;border-radius:5px;background:rgba(255,255,255,.14)}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border:none;border-radius:50%;background:#fff}
+select{
+  background:rgba(255,255,255,.06);color:var(--txt);border:1px solid var(--line);
+  border-radius:11px;padding:0 10px;height:44px;font-size:13px;font-family:inherit;cursor:pointer;
+  -webkit-appearance:none;appearance:none;
+}
+
+/* ---------- visualizer ---------- */
+.visbar{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
+.vbtn{
+  padding:9px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;
+  border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--dim);
+  font-family:inherit;transition:.18s;min-height:38px;touch-action:manipulation;
+}
+.vbtn:hover{color:var(--txt)}
+.vbtn.on{background:linear-gradient(135deg,rgba(34,211,238,.2),rgba(167,139,250,.2));border-color:var(--c1);color:#bff5ff}
+#canvas{
+  width:100%;height:230px;display:block;border-radius:12px;
+  background:linear-gradient(180deg,rgba(4,8,16,.75),rgba(10,16,30,.9));
+  border:1px solid rgba(255,255,255,.07);touch-action:manipulation;cursor:pointer;
+}
+.opts{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--dim);align-items:center}
+.opts label{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.opts input[type=range]{width:104px;flex:none}
+.opts select{height:38px;font-size:12.5px}
+
+/* ---------- meters ---------- */
+.meters{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.meter{background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.meter .t{font-size:11px;color:var(--dim);display:flex;justify-content:space-between;margin-bottom:7px;letter-spacing:.5px}
+.meter .t b{font-variant-numeric:tabular-nums;color:var(--txt);font-size:12px}
+.bar{height:8px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden;position:relative}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:6px;transition:width .05s linear;width:0}
+#rmsBar{background:linear-gradient(90deg,var(--ok),var(--c1))}
+#peakBar{background:linear-gradient(90deg,var(--c1),var(--c3))}
+.bar u{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff;opacity:.8;border-radius:2px;left:0}
+
+/* ---------- info ---------- */
+.info{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.cell{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:12px;padding:9px 11px;min-width:0}
+.cell .k{font-size:10.5px;color:var(--dim2);letter-spacing:.6px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell .v{font-size:14px;font-weight:650;font-variant-numeric:tabular-nums;word-break:break-all;line-height:1.35}
+.cell .v.sm{font-size:12.5px;font-weight:600}
+.cell.wide{grid-column:span 3}
+.cell .v .tag{font-size:11px;font-weight:600;padding:2px 7px;border-radius:6px;display:inline-block}
+.tag.ok{background:rgba(52,211,153,.16);color:#6ee7b7}
+.tag.warn{background:rgba(251,191,36,.16);color:#fcd34d}
+.tag.mut{background:rgba(255,255,255,.08);color:var(--dim)}
+.hex{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--dim);letter-spacing:.5px;word-break:break-all;font-weight:500}
+.note{font-size:11.5px;color:var(--dim2);margin-top:10px;line-height:1.65}
+.note b{color:var(--dim)}
+
+/* ---------- device ---------- */
+.devgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.chips .lbl{font-size:11px;color:var(--dim2);width:100%;margin:2px 0 -1px;letter-spacing:.5px}
+.chip{
+  font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:9px;
+  background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--dim);
+  display:flex;align-items:center;gap:5px;
+}
+.chip::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--dim2);flex:none}
+.chip.ok{background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:#6ee7b7}
+.chip.ok::before{background:var(--ok)}
+.chip.mid{background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.3);color:#fcd34d}
+.chip.mid::before{background:var(--warn)}
+.chip.no{background:rgba(251,113,133,.1);border-color:rgba(251,113,133,.28);color:#fda4af;opacity:.85}
+.chip.no::before{background:var(--bad)}
+.copybtn{
+  margin-top:11px;width:100%;padding:11px;border-radius:11px;cursor:pointer;
+  border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--txt);
+  font-size:13px;font-weight:600;font-family:inherit;min-height:44px;
+}
+.copybtn:hover{background:rgba(255,255,255,.1)}
+.wake{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--dim)}
+.wake label{display:flex;align-items:center;gap:7px;cursor:pointer}
+
+/* ---------- mic ---------- */
+.rec{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.recbtn{
+  padding:12px 16px;border-radius:12px;font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;
+  border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--txt);
+  display:flex;align-items:center;gap:7px;min-height:46px;touch-action:manipulation;
+}
+.recbtn:disabled{opacity:.4;cursor:not-allowed}
+.recbtn.rec-on{background:rgba(251,113,133,.18);border-color:var(--bad);color:#fecdd3}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--bad);animation:pulse 1s infinite;flex:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+footer{text-align:center;color:var(--dim2);font-size:11px;margin-top:22px;line-height:1.7}
+
+@media(max-width:680px){
+  body{padding:12px 11px calc(30px + env(safe-area-inset-bottom))}
+  #canvas{height:180px}
+  .info{grid-template-columns:repeat(2,1fr)}
+  .devgrid{grid-template-columns:repeat(2,1fr)}
+  .cell.wide{grid-column:span 2}
+  .meters{grid-template-columns:1fr}
+  h1{font-size:17px}
+  header{gap:9px}
+  .devbar{display:none}
+  .stage{max-height:230px}
+  .tab{font-size:12.5px;padding:11px 6px}
+  .ctrl{gap:8px}
+  .btn{width:42px;height:42px}
+  .btn.play{width:46px;height:46px}
+}
+@media(max-width:380px){
+  .info,.devgrid{grid-template-columns:1fr}
+  .cell.wide{grid-column:span 1}
+}
+@media (orientation:landscape) and (max-height:520px){
+  .stage{max-height:180px}
+  #canvas{height:150px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#03121b" stroke-width="2.2" stroke-linecap="round">
+        <path d="M3 12h2l2-6 3 14 3-11 2 6h4"/>
+      </svg>
+    </div>
+    <h1>音频声波显示器<small>MP3 · MP4 · 麦克风 · 实时频谱</small></h1>
+    <div class="devbar" id="devbar" title="自动检测结果">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="2" width="14" height="20" rx="3"/><path d="M11 18h2"/></svg>
+      <span id="devbarTxt">检测中…</span>
+    </div>
+  </header>
+
+  <!-- 模式 -->
+  <div class="tabs">
+    <button class="tab on" id="tabFile">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      文件（MP3/MP4）
+    </button>
+    <button class="tab" id="tabMic">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/></svg>
+      麦克风
+    </button>
+  </div>
+
+  <!-- 上传 -->
+  <div class="card" id="fileCard">
+    <h2>载入音频 / 视频</h2>
+    <div id="env" class="env hidden"></div>
+    <div class="drop" id="drop">
+      <input type="file" id="fileInput" accept="audio/*,video/*,.mp3,.mp4,.m4a,.wav,.ogg,.flac,.webm,.mkv,.mov,.aac">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>
+      <div class="big" id="dropBig">点击这里选择文件</div>
+      <div class="sub" id="dropSub"></div>
+    </div>
+    <div id="hint" class="hint hidden"></div>
+    <div class="mini">
+      没弹出文件选择器？<a id="pickerBtn">点这里再试一次</a>
+      <span id="noPicker" class="hidden">（当前浏览器不支持该接口）</span>
+    </div>
+    <div id="err" class="err hidden"></div>
+  </div>
+
+  <!-- 麦克风 -->
+  <div class="card hidden" id="micCard">
+    <h2>麦克风实时输入</h2>
+    <div style="font-size:13px;color:var(--dim);line-height:1.65">
+      开启后对着说话或播放音乐，下方实时显示声波。为防啸叫，麦克风不会从扬声器回放。
+      <span id="micNote" style="display:block;margin-top:6px;color:var(--warn)"></span>
+    </div>
+    <div class="rec">
+      <button class="recbtn" id="micBtn">开启麦克风</button>
+      <button class="recbtn" id="recBtn" disabled>● 开始录音</button>
+      <span id="recTime" class="tm" style="font-size:12.5px"></span>
+    </div>
+    <div id="micErr" class="err hidden"></div>
+  </div>
+
+  <!-- 播放画面 -->
+  <div class="card" id="stageCard">
+    <h2>画面 <span class="more" id="fsTxt">播放时可保持屏幕常亮</span></h2>
+    <div class="stage" id="stage">
+      <span class="badge hidden" id="badge"></span>
+      <video id="media" playsinline webkit-playsinline x5-playsinline crossorigin="anonymous"></video>
+      <div class="ph" id="ph">
+        <div>
+          <div class="wave"><i></i><i></i><i></i><i></i><i></i></div>
+          <div id="phTxt">尚未载入文件</div>
+        </div>
+      </div>
+    </div>
+    <div class="ctrl">
+      <button class="btn play" id="playBtn" title="播放 / 暂停">
+        <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <button class="btn" id="backBtn" title="快退 5 秒">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/></svg>
+      </button>
+      <button class="btn" id="fwdBtn" title="快进 5 秒">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 5l7 7-7 7M4 5l7 7-7 7"/></svg>
+      </button>
+      <button class="btn" id="loopBtn" title="循环">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+      </button>
+      <select id="rate" title="播放速度">
+        <option value="0.5">0.5×</option><option value="0.75">0.75×</option>
+        <option value="1" selected>1×</option><option value="1.25">1.25×</option>
+        <option value="1.5">1.5×</option><option value="2">2×</option>
+      </select>
+      <button class="btn" id="fsBtn" title="全屏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+      </button>
+      <div style="display:flex;align-items:center;gap:6px;min-width:100px;flex:1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--dim)" stroke-width="2" stroke-linecap="round" style="width:17px;height:17px;flex:none"><path d="M11 5L6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7"/></svg>
+        <input type="range" id="vol" min="0" max="1" step="0.01" value="1" title="音量">
+      </div>
+      <div class="seek">
+        <span class="tm" id="curT">0:00</span>
+        <input type="range" id="seek" min="0" max="1000" value="0" step="1">
+        <span class="tm" id="durT">0:00</span>
+      </div>
+    </div>
+    <div class="wake">
+      <label><input type="checkbox" id="wakeChk"> 播放时保持屏幕常亮</label>
+      <span class="tm" id="wakeState"></span>
+    </div>
+  </div>
+
+  <!-- 可视化 -->
+  <div class="card">
+    <h2>声波 / 频谱 <span class="more" id="visMore">点画面可切换模式</span></h2>
+    <div class="visbar">
+      <button class="vbtn on" data-vis="wave">波形 Waveform</button>
+      <button class="vbtn" data-vis="bars">频谱柱 Bars</button>
+      <button class="vbtn" data-vis="radial">环形 Radial</button>
+      <button class="vbtn" data-vis="spec">声谱图 Spectrogram</button>
+    </div>
+    <canvas id="canvas"></canvas>
+    <div class="meters">
+      <div class="meter">
+        <div class="t"><span>电平 RMS</span><b id="rmsTxt">-∞ dB</b></div>
+        <div class="bar"><i id="rmsBar"></i></div>
+      </div>
+      <div class="meter">
+        <div class="t"><span>峰值 Peak</span><b id="peakTxt">-∞ dB</b></div>
+        <div class="bar"><i id="peakBar"></i><u id="peakHold"></u></div>
+      </div>
+    </div>
+    <div class="opts">
+      <label>FFT <select id="fft">
+        <option value="512">512</option><option value="1024">1024</option>
+        <option value="2048" selected>2048</option><option value="4096">4096</option><option value="8192">8192</option>
+      </select></label>
+      <label>平滑 <input type="range" id="smooth" min="0" max="0.95" step="0.05" value="0.8"></label>
+      <label>增益 <input type="range" id="gainv" min="0.5" max="6" step="0.1" value="1.6"></label>
+      <span class="tm" id="fpsTxt"></span>
+    </div>
+  </div>
+
+  <!-- 文件信息 -->
+  <div class="card">
+    <h2>文件信息</h2>
+    <div class="info">
+      <div class="cell wide"><div class="k">文件名</div><div class="v sm" id="iName">—</div></div>
+      <div class="cell"><div class="k">真实格式</div><div class="v" id="iFmt">—</div></div>
+      <div class="cell"><div class="k">扩展名核验</div><div class="v" id="iExt">—</div></div>
+      <div class="cell"><div class="k">文件大小</div><div class="v" id="iSize">—</div></div>
+      <div class="cell"><div class="k">时长</div><div class="v" id="iDur">—</div></div>
+      <div class="cell"><div class="k">视频画面</div><div class="v" id="iRes">—</div></div>
+      <div class="cell"><div class="k">帧率（实测）</div><div class="v" id="iFps">—</div></div>
+      <div class="cell"><div class="k">音频采样率</div><div class="v" id="iSr">—</div></div>
+      <div class="cell"><div class="k">声道数</div><div class="v" id="iCh">—</div></div>
+      <div class="cell"><div class="k">估算总码率</div><div class="v" id="iBitrate">—</div></div>
+      <div class="cell wide"><div class="k">文件头（十六进制 · 前 16 字节）</div><div class="v hex" id="iHex">—</div></div>
+    </div>
+    <div class="note">
+      <b>说明：</b>格式按文件头字节识别，不看扩展名；视频分辨率 / 帧率来自解码器实际读数，采样率与声道数通过完整解码探测（受设备内存限制，超大文件会自动跳过并回退显示播放上下文采样率）。
+    </div>
+  </div>
+
+  <!-- 设备检测 -->
+  <div class="card">
+    <h2>设备与浏览器自动检测</h2>
+    <div class="devgrid">
+      <div class="cell"><div class="k">设备类型</div><div class="v" id="dType">—</div></div>
+      <div class="cell"><div class="k">设备</div><div class="v" id="dName">—</div></div>
+      <div class="cell"><div class="k">操作系统</div><div class="v" id="dOs">—</div></div>
+      <div class="cell"><div class="k">浏览器</div><div class="v" id="dBr">—</div></div>
+      <div class="cell"><div class="k">渲染引擎</div><div class="v" id="dEngine">—</div></div>
+      <div class="cell"><div class="k">浏览器版本</div><div class="v" id="dVer">—</div></div>
+      <div class="cell"><div class="k">屏幕</div><div class="v" id="dScreen">—</div></div>
+      <div class="cell"><div class="k">像素比 / 触控</div><div class="v" id="dDpr">—</div></div>
+      <div class="cell"><div class="k">CPU 核心 / 内存</div><div class="v" id="dHw">—</div></div>
+      <div class="cell wide"><div class="k">运行环境</div><div class="v sm" id="dEnv">—</div></div>
+    </div>
+    <div class="chips">
+      <div class="lbl">接口能力</div>
+      <div id="capChips"></div>
+    </div>
+    <div class="chips">
+      <div class="lbl">解码格式支持（当前浏览器）</div>
+      <div id="fmtChips"></div>
+    </div>
+    <div id="devAdvice" class="note"></div>
+    <button class="copybtn" id="copyBtn">复制诊断信息（反馈问题时用）</button>
+  </div>
+
+  <footer>
+    纯前端运行 · 文件不会上传到任何服务器<br>
+    快捷键（电脑）：空格播放/暂停 · ←/→ 快退快进 5 秒 · 1~4 切换可视化
+  </footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+var $ = function(s){return document.querySelector(s);};
+var mediaEl=$('#media'), canvas=$('#canvas'), c2d=canvas.getContext('2d');
+var actx=null, analyser=null, mediaSrc=null, micSrc=null, micStream=null, masterGain=null;
+var objectURL=null, curFile=null, mode='file', vis='wave';
+var peaks=null, spec=null, specCtx=null, specReady=false;
+var raf=null, rmsPeak=0, vol=1, seeking=false;
+var recorder=null, recChunks=[], recT0=0, recTimer=null;
+var fpsVal=null, metaProbed=false, gotFile=false, probeTimer=null;
+var gainV=1.6, wakeLock=null;
+
+/* =========================================================
+   1. 设备 / 浏览器自动检测
+   ========================================================= */
+var DEV = (function(){
+  var ua = navigator.userAgent || '';
+  var d = {
+    ua:ua, isIOS:false, isAndroid:false, isMobile:false, isTablet:false, isDesktop:true,
+    os:'未知', osVer:'', device:'未知设备', devType:'桌面电脑',
+    browser:'未知浏览器', bver:'', engine:'未知', inApp:null, secure:false
+  };
+
+  /* --- 应用内置浏览器（仅社交/内容类 App，系统浏览器不计入） --- */
+  var m;
+  m = ua.match(/MicroMessenger\/([\d.]+)/);      if(m){ d.inApp={name:'微信', ver:m[1]}; }
+  else if(m = ua.match(/wxwork\/([\d.]+)/))       { d.inApp={name:'企业微信', ver:m[1]}; }
+  else if(m = ua.match(/\bQQ\/([\d.]+)/))         { d.inApp={name:'QQ', ver:m[1]}; }
+  else if(m = ua.match(/Weibo/))                  { d.inApp={name:'微博', ver:''}; }
+  else if(m = ua.match(/DingTalk/))               { d.inApp={name:'钉钉', ver:''}; }
+  else if(m = ua.match(/Lark|Feishu/))            { d.inApp={name:'飞书', ver:''}; }
+  else if(m = ua.match(/AlipayClient\/([\d.]+)/)) { d.inApp={name:'支付宝', ver:m[1]}; }
+  else if(m = ua.match(/baiduboxapp\/([\d.]+)/))  { d.inApp={name:'百度 App', ver:m[1]}; }
+  else if(m = ua.match(/Douyin|aweme/))           { d.inApp={name:'抖音', ver:''}; }
+  else if(m = ua.match(/toutiao|NewsArticle/))    { d.inApp={name:'今日头条', ver:''}; }
+  else if(m = ua.match(/BiliApp/))                { d.inApp={name:'哔哩哔哩', ver:''}; }
+  else if(m = ua.match(/Kuaishou|kwai/))          { d.inApp={name:'快手', ver:''}; }
+  else if(m = ua.match(/Taobao|tmall/))           { d.inApp={name:'淘宝', ver:''}; }
+
+  /* --- 操作系统 --- */
+  var isIPadOS = (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints||0) > 1);
+  d.isIOS = /iP(hone|od|ad)/.test(ua) || isIPadOS;
+  d.isAndroid = /Android|Adr/.test(ua);
+
+  if(d.isIOS){
+    var mv = ua.match(/OS (\d+)[_.](\d+)/);
+    d.osVer = mv ? mv[1]+'.'+(mv[2]||'0') : '';
+    d.os = /iP(hone|od)/.test(ua) ? 'iOS' : 'iPadOS';
+    var sz = Math.max(screen.width, screen.height), sm = Math.min(screen.width, screen.height);
+    d.device = /iPad/.test(ua) || isIPadOS ? 'iPad' : (/iPod/.test(ua) ? 'iPod touch' : 'iPhone');
+    d.isTablet = d.device === 'iPad';
+    d.isMobile = !d.isTablet;
+    // 依据屏幕逻辑分辨率推断常见 iPhone 机型
+    if(d.device==='iPhone'){
+      var map={'320x568':'SE/5s/5','375x667':'6/7/8/SE2','414x736':'6+/7+/8+','375x812':'X/XS/11 Pro',
+        '414x896':'XR/11/11 Pro Max','390x844':'12/13/14','428x926':'12/13/14 Pro Max',
+        '393x852':'15/16','430x932':'15/16 Pro Max','402x874':'16 Pro','440x956':'16 Pro Max'};
+      var key = sm+'x'+sz;
+      d.device = 'iPhone ' + (map[key] || ('（'+sm+'×'+sz+'）'));
+    }
+    if(d.isTablet) d.device = 'iPad（'+sm+'×'+sz+'）';
+  } else if(d.isAndroid){
+    var av = ua.match(/Android (\d+(\.\d+)*)/);
+    d.osVer = av ? av[1] : '';
+    d.os = 'Android';
+    // 从 UA 括号段落中提取设备代号（跳过语言、系统、Build 等无关段）
+    var paren = ua.match(/\(([^)]+)\)/);
+    var devName = 'Android 设备';
+    if(paren){
+      var parts = paren[1].split(';');
+      for(var pi=0; pi<parts.length; pi++){
+        var seg = parts[pi].trim();
+        if(!seg) continue;
+        if(/^(U|Linux|Android|wv|X11|CrOS)/i.test(seg)) continue;
+        if(/^[a-z]{2}(-[A-Za-z]{2})?$/i.test(seg)) continue;   // zh-cn / en-US
+        if(/Build\/|HMSCore|AppleWebKit|KHTML|Gecko/i.test(seg)) continue;
+        devName = seg; break;
+      }
+    }
+    d.device = devName;
+    d.isMobile = /Mobile/.test(ua);
+    d.isTablet = !d.isMobile;
+  } else if(/Windows NT/.test(ua)){
+    var wv = ua.match(/Windows NT (\d+\.\d+)/);
+    d.os = 'Windows'; d.osVer = {'10.0':'10/11','6.3':'8.1','6.2':'8','6.1':'7'}[wv?wv[1]:''] || (wv?wv[1]:'');
+    d.device = 'Windows PC';
+  } else if(/Mac OS X/.test(ua)){
+    d.os='macOS'; var mcv = ua.match(/Mac OS X (\d+)[_.](\d+)/);
+    d.osVer = mcv ? mcv[1]+'.'+mcv[2] : '';
+    d.device = 'Mac';
+  } else if(/Linux/.test(ua)){ d.os='Linux'; d.device='Linux 设备'; }
+  else if(/CrOS/.test(ua)){ d.os='Chrome OS'; d.device='Chromebook'; }
+
+  d.isDesktop = !d.isIOS && !d.isAndroid && !/Mobile|Mobi|Windows Phone|BlackBerry|Opera Mini/i.test(ua);
+  d.devType = d.isTablet ? '平板' : (d.isMobile ? '手机' : (d.isDesktop ? '桌面电脑' : '移动设备'));
+
+  /* --- 浏览器与引擎 --- */
+  function pick(re, name){
+    var mm = ua.match(re); if(mm){ d.browser = name; d.bver = mm[1]||''; return true; } return false;
+  }
+  var found =
+    pick(/Edg(?:e|A|iOS)?\/([\d.]+)/, 'Edge') ||
+    pick(/OPR\/([\d.]+)/, 'Opera') ||
+    pick(/SamsungBrowser\/([\d.]+)/, 'Samsung Internet') ||
+    pick(/CriOS\/([\d.]+)/, 'Chrome') ||
+    pick(/FxiOS\/([\d.]+)/, 'Firefox') ||
+    pick(/HuaweiBrowser\/([\d.]+)/, '华为浏览器') ||
+    pick(/HeyTapBrowser\/([\d.]+)/, 'OPPO 浏览器') ||
+    pick(/VivoBrowser\/([\d.]+)/, 'vivo 浏览器') ||
+    pick(/MiuiBrowser\/([\d.]+)/, '小米浏览器') ||
+    pick(/MZBrowser\/([\d.]+)/, '魅族浏览器') ||
+    pick(/QQBrowser\/([\d.]+)/, 'QQ 浏览器') ||
+    pick(/Quark\/([\d.]+)/, '夸克') ||
+    pick(/UCBrowser\/([\d.]+)/, 'UC 浏览器') ||
+    pick(/baiduboxapp\/([\d.]+)/, '百度 App') ||
+    pick(/Chrome\/([\d.]+)/, 'Chrome') ||
+    pick(/Firefox\/([\d.]+)/, 'Firefox') ||
+    pick(/Version\/([\d.]+).*Safari/, 'Safari') ||
+    pick(/Safari\/([\d.]+)/, 'Safari');
+  if(!found && d.isIOS){ d.browser='Safari'; d.bver=''; }
+  if(d.inApp){ d.browser = d.inApp.name+'（内置浏览器）'; }
+
+  if(d.isIOS){ d.engine = 'WebKit（iOS 强制）'; }
+  else if(d.browser==='Firefox'){ d.engine = 'Gecko'; }
+  else if(d.browser==='Edge'||d.browser==='Chrome'||d.browser==='Opera'){ d.engine = 'Blink（Chromium）'; }
+  else if(d.browser==='Safari'){ d.engine = 'WebKit'; }
+  else if(/Chrome\/|CriOS\/|Chromium\//.test(ua)){ d.engine = 'Blink（Chromium）'; }
+  else if(/AppleWebKit/.test(ua)){ d.engine = 'WebKit'; }
+  else if(/Gecko\/|Firefox\//.test(ua)){ d.engine = 'Gecko'; }
+  else { d.engine = '未知'; }
+
+  d.secure = (location.protocol === 'https:') ||
+             (location.protocol === 'file:') ||
+             /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname || '');
+
+  /* --- 能力标志 --- */
+  d.cap = {
+    webaudio: !!(window.AudioContext||window.webkitAudioContext),
+    gum: !!((navigator.mediaDevices && navigator.mediaDevices.getUserMedia) ||
+            navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia),
+    recorder: !!window.MediaRecorder,
+    fullscreen: !!(document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen),
+    wake: !!navigator.wakeLock,
+    rVFC: !!HTMLMediaElement.prototype.requestVideoFrameCallback,
+    playbackQuality: !!HTMLMediaElement.prototype.getVideoPlaybackQuality,
+    showPicker: !!(document.createElement('input').showPicker)
+  };
+  return d;
+})();
+
+/* ---------- 能力 / 格式检测渲染 ---------- */
+function canPlay(types){
+  if(!mediaEl.canPlayType) return 0;
+  for(var i=0;i<types.length;i++){
+    var r = mediaEl.canPlayType(types[i]);
+    if(r==='probably') return 2;
+    if(r==='maybe') return 1;
+  }
+  return 0;
+}
+function renderCaps(){
+  var c = DEV.cap;
+  var caps = [
+    ['Web Audio 音频分析', c.webaudio, c.webaudio?'':'当前浏览器不支持，无法显示声波'],
+    ['麦克风采集 getUserMedia', c.gum, c.gum?(DEV.secure?'':'需 https 或本地文件环境'):'不支持'],
+    ['录音 MediaRecorder', c.recorder, c.recorder?'':'不支持录音'],
+    ['全屏播放', c.fullscreen, c.fullscreen?'':'不支持'],
+    ['屏幕常亮 Wake Lock', c.wake, c.wake?'':'不支持（仅 Chrome/Edge 系）'],
+    ['视频帧率测量', (c.rVFC||c.playbackQuality), (c.rVFC||c.playbackQuality)?'':'将回退估算'],
+    ['文件选择器 API', c.showPicker, c.showPicker?'':'将回退为普通点击']
+  ];
+  var html='';
+  for(var i=0;i<caps.length;i++){
+    var k=caps[i][0], ok=caps[i][1], tip=caps[i][2];
+    var cls = ok ? (tip ? 'mid' : 'ok') : 'no';
+    html += '<span class="chip '+cls+'" title="'+tip+'">'+k+(ok?'':' · 不支持')+'</span>';
+  }
+  $('#capChips').innerHTML = html;
+
+  var fmts = [
+    ['MP3','audio/mpeg'],
+    ['MP4 (H.264+AAC)','video/mp4; codecs="avc1.42E01E, mp4a.40.2"'],
+    ['MP4 (H.265/HEVC)','video/mp4; codecs="hev1.1.6.L93.B0"'],
+    ['M4A (AAC)','audio/mp4; codecs="mp4a.40.2"'],
+    ['WAV','audio/wav'],
+    ['FLAC','audio/flac'],
+    ['Ogg Vorbis','audio/ogg; codecs="vorbis"'],
+    ['WebM (VP9+Opus)','video/webm; codecs="vp9, opus"'],
+    ['Opus','audio/ogg; codecs="opus"'],
+    ['AV1','video/mp4; codecs="av01.0.05M.08"']
+  ];
+  var fh='';
+  for(var j=0;j<fmts.length;j++){
+    var lv = canPlay([fmts[j][1]]);
+    var c2 = lv===2?'ok':(lv===1?'mid':'no');
+    var s2 = lv===2?'✓':(lv===1?'~':'✕');
+    fh += '<span class="chip '+c2+'">'+fmts[j][0]+' '+s2+'</span>';
+  }
+  $('#fmtChips').innerHTML = fh;
+}
+function renderDevice(){
+  $('#dType').textContent = DEV.devType;
+  $('#dName').textContent = DEV.device;
+  $('#dOs').textContent  = DEV.os + (DEV.osVer? ' '+DEV.osVer : '');
+  $('#dBr').textContent  = DEV.browser;
+  $('#dEngine').textContent = DEV.engine;
+  $('#dVer').textContent = DEV.bver || '—';
+  var w=screen.width, h=screen.height;
+  $('#dScreen').textContent = Math.min(w,h)+'×'+Math.max(w,h)+'（视口 '+window.innerWidth+'×'+window.innerHeight+'）';
+  $('#dDpr').textContent = (window.devicePixelRatio||1).toFixed(2)+'x / '+(navigator.maxTouchPoints||0)+' 点';
+  $('#dHw').textContent = (navigator.hardwareConcurrency||'—')+' 核 / '+(navigator.deviceMemory? navigator.deviceMemory+' GB':'—');
+
+  var envBits=[];
+  envBits.push(location.protocol.replace(':','')+ (DEV.secure?'（安全上下文 ✓）':'（非安全上下文 ✕）'));
+  envBits.push(DEV.inApp ? 'App 内置浏览器：'+DEV.inApp.name+(DEV.inApp.ver?' '+DEV.inApp.ver:'') : '独立浏览器环境');
+  try{ envBits.push(window.self!==window.top ? '运行于 iframe 中' : '顶层页面'); }catch(e){ envBits.push('运行于 iframe 中'); }
+  if(navigator.connection && navigator.connection.effectiveType) envBits.push('网络 '+navigator.connection.effectiveType);
+  var lang = navigator.language||'';
+  if(lang) envBits.push('语言 '+lang);
+  $('#dEnv').innerHTML = envBits.map(function(x){return '<span class="tag '+(/✕|iframe|App 内置/.test(x)?'warn':'ok')+'">'+x+'</span>';}).join(' ');
+  $('#devbarTxt').innerHTML = '<b>'+DEV.devType+'</b> · '+DEV.browser+(DEV.bver?' '+DEV.bver.split('.')[0]:'');
+
+  // 建议
+  var adv=[];
+  if(DEV.inApp) adv.push('检测到 <b>'+DEV.inApp.name+'</b> 内置浏览器。若文件选择或麦克风无反应，请点右上角「⋯」→ 用系统浏览器打开（iPhone 选 Safari，安卓选 Chrome）。');
+  if(!DEV.secure && DEV.cap.gum) adv.push('当前非安全上下文（'+location.protocol+'），<b>麦克风会被浏览器策略禁用</b>。请用 https 或本地文件方式打开。');
+  if(DEV.isIOS) adv.push('iOS 提示：机身左侧<b>静音拨片</b>会静音经 Web Audio 输出的声音，播放无声时请先关闭静音；iPhone 上视频默认内嵌播放，可点全屏按钮放大。');
+  if(DEV.isAndroid && !DEV.cap.webaudio) adv.push('当前浏览器 Web Audio 支持异常，建议换用 Chrome。');
+  if(/Chrome|Safari|Edge|Firefox/.test(DEV.browser) && !DEV.cap.recorder) adv.push('该浏览器不支持 MediaRecorder，录音按钮不可用，但实时可视化正常。');
+  if(DEV.isMobile) adv.push('移动设备已自动优化：可视化默认频谱柱、FFT 降至 1024、大文件跳过精确解码探测以节省内存。');
+  if(!adv.length) adv.push('未发现兼容性问题，全部功能可用。');
+  $('#devAdvice').innerHTML = adv.join('<br>');
+}
+
+/* =========================================================
+   2. 工具
+   ========================================================= */
+function fmtBytes(b){
+  if(b==null||isNaN(b)) return '—';
+  var u=['B','KB','MB','GB'], i=0; b=+b;
+  while(b>=1024&&i<u.length-1){b/=1024;i++;}
+  return (i===0?b:b.toFixed(b<10?2:1))+' '+u[i];
+}
+function fmtTime(s){
+  if(s==null||!isFinite(s)||s<0) return '0:00';
+  var m=Math.floor(s/60), ss=Math.floor(s%60);
+  if(s>=3600){var h=Math.floor(s/3600);return h+':'+String(m%60).padStart(2,'0')+':'+String(ss).padStart(2,'0');}
+  return m+':'+String(ss).padStart(2,'0');
+}
+function fmtTimeMs(s){
+  if(s==null||!isFinite(s)||s<0) return '—';
+  return fmtTime(Math.floor(s))+'.'+Math.floor((s%1)*10);
+}
+function dbToPct(db){ var v=(db+60)/60; return Math.max(0,Math.min(1,v)); }
+function toDb(v){ return v<=0.000015 ? -Infinity : 20*Math.log10(v); }
+
+/* =========================================================
+   3. 文件头嗅探
+   ========================================================= */
+function sniff(bytes){
+  var str=function(o,n){var s='';for(var i=o;i<o+n&&i<bytes.length;i++)s+=String.fromCharCode(bytes[i]);return s;};
+  if(str(4,4)==='ftyp'){
+    var brand=str(8,4).replace(/[^\x20-\x7E]/g,'');
+    var isM4a = /^(M4A |M4B )/.test(brand) || brand.indexOf('M4A')===0;
+    return {kind:'mp4', name:'MP4 / ISO-BMFF（'+brand.trim()+'）', mime:'video/mp4', video:!isM4a};
+  }
+  if(str(0,3)==='ID3') return {kind:'mp3', name:'MP3（ID3 标签）', mime:'audio/mpeg', video:false};
+  if(bytes[0]===0xFF && (bytes[1]&0xE0)===0xE0) return {kind:'mp3', name:'MP3（裸帧）', mime:'audio/mpeg', video:false};
+  if(str(0,4)==='RIFF' && str(8,4)==='WAVE') return {kind:'wav', name:'WAV（PCM）', mime:'audio/wav', video:false};
+  if(str(0,4)==='fLaC') return {kind:'flac', name:'FLAC 无损', mime:'audio/flac', video:false};
+  if(str(0,4)==='OggS') return {kind:'ogg', name:'Ogg（Vorbis/Opus）', mime:'audio/ogg', video:false};
+  if(bytes[0]===0x1A&&bytes[1]===0x45&&bytes[2]===0xDF&&bytes[3]===0xA3) return {kind:'webm', name:'WebM / Matroska', mime:'video/webm', video:true};
+  if(str(0,4)==='MAC ') return {kind:'ape', name:"Monkey's Audio", mime:'audio/x-ape', video:false};
+  if(str(0,4)==='BM') return {kind:'img', name:'位图 BMP', mime:'image/bmp', video:false};
+  if(str(0,3)==='ID3'||str(0,4)==='\u0000\u0000\u0000') return {kind:'unknown', name:'未知', mime:'application/octet-stream', video:false};
+  return {kind:'unknown', name:'未识别格式', mime:'application/octet-stream', video:false};
+}
+
+/* =========================================================
+   4. 音频上下文
+   ========================================================= */
+function ensureAudio(){
+  if(actx) return actx;
+  var AC = window.AudioContext||window.webkitAudioContext;
+  if(!AC){ showErr('当前浏览器不支持 Web Audio API，无法分析声波。'); return null; }
+  actx = new AC();
+  analyser = actx.createAnalyser();
+  analyser.fftSize = parseInt($('#fft').value,10) || 2048;
+  analyser.smoothingTimeConstant = parseFloat($('#smooth').value);
+  analyser.minDecibels = -95; analyser.maxDecibels = -10;
+  masterGain = actx.createGain();
+  masterGain.gain.value = vol;
+  analyser.connect(masterGain);
+  masterGain.connect(actx.destination);
+  return actx;
+}
+function resumeAudio(){
+  if(actx && actx.state==='suspended'){
+    var p = actx.resume();
+    if(p && p.catch) p.catch(function(){});
+  }
+}
+function attachMediaSrc(){
+  if(!ensureAudio()) return;
+  if(!mediaSrc){
+    try{ mediaSrc = actx.createMediaElementSource(mediaEl); }
+    catch(e){ return; }
+    mediaSrc.connect(analyser);
+  }
+}
+
+/* =========================================================
+   5. 载入文件
+   ========================================================= */
+// 移动端/平板内存有限，超过阈值跳过整文件解码探测，避免 OOM 崩溃
+var PROBE_LIMIT = (DEV.isIOS || DEV.isAndroid) ? 60*1024*1024 : 200*1024*1024;
+
+function loadFile(file){
+  if(!file) return;
+  hideErr();
+  if(objectURL){ URL.revokeObjectURL(objectURL); objectURL=null; }
+  curFile=file; metaProbed=false; fpsVal=null;
+
+  var fr = new FileReader();
+  fr.onerror = function(){ showErr('读取文件失败，请重试。'); };
+  fr.onload = function(){
+    var bytes = new Uint8Array(fr.result);
+    var info = sniff(bytes);
+    var ext = (file.name.split('.').pop()||'').toLowerCase();
+    var blob;
+    try{ blob = file.slice(0, file.size, info.mime); }catch(e){ blob = file; }
+    objectURL = URL.createObjectURL(blob);
+
+    $('#iName').textContent = file.name;
+    $('#iFmt').textContent = info.name;
+    $('#iSize').textContent = fmtBytes(file.size);
+    $('#iHex').textContent = Array.prototype.map.call(bytes,function(b){
+      return ('0'+b.toString(16).toUpperCase()).slice(-2);
+    }).join(' ');
+
+    var expect = {mp3:['mp3'],mp4:['mp4','m4a','m4v','mov'],wav:['wav'],flac:['flac'],
+      ogg:['ogg','oga','opus'],webm:['webm','mkv'],ape:['ape'],img:['bmp']}[info.kind]||[];
+    var okExt = expect.length===0 || expect.indexOf(ext)>=0;
+    $('#iExt').innerHTML = okExt
+      ? '<span class="tag ok">.'+(ext||'无')+' 一致</span>'
+      : '<span class="tag warn">.'+(ext||'无')+' 与真实格式不符</span>';
+
+    $('#phTxt').textContent = '载入中…';
+    $('#durT').textContent='0:00'; $('#curT').textContent='0:00';
+    $('#iSr').textContent = file.size>PROBE_LIMIT ? '跳过（文件过大）' : '探测中…';
+    $('#iCh').textContent = file.size>PROBE_LIMIT ? '—' : '探测中…';
+    $('#iRes').textContent='—'; $('#iFps').textContent='—';
+    $('#iBitrate').textContent='—'; $('#iDur').textContent='—';
+    $('#seek').value=0;
+
+    mediaEl.loop = $('#loopBtn').classList.contains('on');
+    mediaEl.src = objectURL;
+    mediaEl.load();
+
+    var b=$('#badge');
+    if(info.kind==='mp4'||info.kind==='webm'){
+      b.textContent = (!okExt&&ext==='mp3') ? '⚠ 扩展名是 .mp3，实为视频文件' : (info.video?'含视频轨':'纯音频容器');
+      b.className = 'badge' + ((!okExt&&ext==='mp3')?' warn':'');
+      b.classList.remove('hidden');
+    } else b.className='badge hidden';
+
+    if(file.size<=PROBE_LIMIT) probeMeta(file);
+    else updateBitrate(mediaEl.duration);
+  };
+  fr.readAsArrayBuffer(file.slice(0,16));
+}
+
+function probeMeta(file){
+  var AC = window.AudioContext||window.webkitAudioContext;
+  if(!AC) return;
+  var tmp=null, settled=false;
+  var to = setTimeout(function(){
+    if(settled) return; settled=true;
+    try{ if(tmp&&tmp.close) tmp.close(); }catch(e){}
+    fallbackMeta();
+  }, 12000);
+
+  var readP = file.arrayBuffer ? file.arrayBuffer() : new Promise(function(res,rej){
+    var r=new FileReader(); r.onload=function(){res(r.result);}; r.onerror=rej; r.readAsArrayBuffer(file);
+  });
+  readP.then(function(ab){
+    tmp = new AC();
+    return new Promise(function(res,rej){
+      var pr = tmp.decodeAudioData(ab.slice(0), res, rej);
+      if(pr && pr.then) pr.then(res,rej);
+    });
+  }).then(function(buf){
+    clearTimeout(to); settled=true; metaProbed=true;
+    $('#iSr').textContent = (buf.sampleRate/1000).toFixed(buf.sampleRate%1000?1:0)+' kHz（'+buf.sampleRate+' Hz）';
+    $('#iCh').textContent = chName(buf.numberOfChannels);
+    $('#iDur').textContent = fmtTimeMs(buf.duration);
+    updateBitrate(buf.duration);
+    try{ if(tmp&&tmp.close) tmp.close(); }catch(e){}
+  }).catch(function(){
+    clearTimeout(to); settled=true;
+    try{ if(tmp&&tmp.close) tmp.close(); }catch(e){}
+    fallbackMeta();
+  });
+}
+function fallbackMeta(){
+  if(metaProbed) return;
+  var a = ensureAudio();
+  if(a){
+    $('#iSr').textContent = a.sampleRate+' Hz（播放上下文）';
+    $('#iCh').textContent = chName(a.destination.channelCount||2)+'（推定）';
+  } else { $('#iSr').textContent='—'; $('#iCh').textContent='—'; }
+}
+function chName(n){
+  return {1:'1 · 单声道 Mono',2:'2 · 立体声 Stereo',4:'4 · 四声道',6:'6 · 5.1 环绕',8:'8 · 7.1 环绕'}[n] || (n+' 声道');
+}
+function updateBitrate(dur){
+  if(!curFile||!dur||!isFinite(dur)){ $('#iBitrate').textContent='—'; return; }
+  var kbps = curFile.size*8/dur/1000;
+  $('#iBitrate').textContent = (kbps>=1000 ? (kbps/1000).toFixed(2)+' Mbps' : kbps.toFixed(0)+' kbps');
+}
+
+/* =========================================================
+   6. 媒体事件
+   ========================================================= */
+mediaEl.addEventListener('loadedmetadata', function(){
+  var d = mediaEl.duration;
+  if(d && isFinite(d)){
+    $('#durT').textContent = fmtTime(d);
+    if(!metaProbed) $('#iDur').textContent = fmtTimeMs(d);
+  }
+  if(mediaEl.videoWidth>0){
+    $('#iRes').textContent = mediaEl.videoWidth+' × '+mediaEl.videoHeight+' px';
+    $('#ph').classList.add('hidden');
+  } else {
+    $('#iRes').innerHTML = '<span class="tag mut">无视频轨（纯音频）</span>';
+    $('#phTxt').textContent = curFile ? (curFile.name+' · 纯音频，无画面') : '纯音频';
+    $('#ph').classList.remove('hidden');
+  }
+  updateBitrate(d);
+  attachMediaSrc();
+});
+mediaEl.addEventListener('play', function(){
+  resumeAudio(); setPlayIcon(true);
+  measureFps();
+  if($('#wakeChk').checked) requestWake();
+});
+mediaEl.addEventListener('pause', function(){ setPlayIcon(false); releaseWake(); });
+mediaEl.addEventListener('ended', function(){ setPlayIcon(false); releaseWake(); });
+mediaEl.addEventListener('timeupdate', function(){
+  if(seeking) return;
+  var d=mediaEl.duration;
+  if(d&&isFinite(d)) $('#seek').value = Math.round(mediaEl.currentTime/d*1000);
+  $('#curT').textContent = fmtTime(mediaEl.currentTime);
+});
+mediaEl.addEventListener('error', function(){
+  var code = mediaEl.error ? mediaEl.error.code : 0;
+  var msg = {1:'加载中止',2:'网络错误',3:'解码失败',
+    4:'浏览器不支持该编码（常见于 MP4 内含 AC3 / DTS / H.265 等本设备无法解码的编码）'}[code]||'无法播放该文件';
+  showErr('播放失败：'+msg+'。可先转成 H.264 + AAC 的 MP4 再试。');
+});
+
+/* 帧率：优先 rVFC，回退 getVideoPlaybackQuality */
+function measureFps(){
+  fpsVal=null;
+  if(mediaEl.videoWidth<=0) return;
+  if(mediaEl.requestVideoFrameCallback){
+    var arr=[];
+    mediaEl.requestVideoFrameCallback(function step(now){
+      arr.push(now);
+      if(arr.length<20){ mediaEl.requestVideoFrameCallback(step); }
+      else{
+        var dt=(arr[19]-arr[0])/19;
+        if(dt>0){ setFps(1000/dt); }
+      }
+    });
+  } else if(mediaEl.getVideoPlaybackQuality){
+    var t0=mediaEl.currentTime, f0=mediaEl.getVideoPlaybackQuality().totalVideoFrames;
+    setTimeout(function(){
+      try{
+        var t1=mediaEl.currentTime, f1=mediaEl.getVideoPlaybackQuality().totalVideoFrames;
+        if(t1>t0+0.3) setFps((f1-f0)/(t1-t0));
+      }catch(e){}
+    }, 2000);
+  }
+}
+function setFps(v){
+  if(!v||!isFinite(v)||v<=0) return;
+  fpsVal=v;
+  $('#iFps').textContent = v.toFixed(1)+' fps';
+  $('#fpsTxt').textContent = '视频 '+(mediaEl.videoWidth||0)+'×'+(mediaEl.videoHeight||0)+' · '+v.toFixed(1)+' fps';
+}
+
+/* =========================================================
+   7. 控制
+   ========================================================= */
+function setPlayIcon(playing){
+  $('#playIcon').innerHTML = playing
+    ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>'
+    : '<path d="M8 5v14l11-7z"/>';
+}
+$('#playBtn').addEventListener('click', function(){
+  if(!mediaEl.src){ showErr('请先载入一个 MP3 或 MP4 文件。'); return; }
+  resumeAudio();
+  attachMediaSrc();
+  if(mediaEl.paused){
+    var p = mediaEl.play();
+    if(p && p.catch) p.catch(function(e){ showErr('无法播放：'+(e.message||e.name)+'。'+(DEV.isIOS?'iOS 需先点击一次屏幕以允许播放。':'')); });
+  } else mediaEl.pause();
+});
+$('#backBtn').addEventListener('click', function(){ mediaEl.currentTime=Math.max(0,mediaEl.currentTime-5); });
+$('#fwdBtn').addEventListener('click', function(){ mediaEl.currentTime=Math.min(mediaEl.duration||0,mediaEl.currentTime+5); });
+$('#seek').addEventListener('input', function(){ seeking=true; });
+$('#seek').addEventListener('change', function(e){
+  seeking=false;
+  if(mediaEl.duration&&isFinite(mediaEl.duration)) mediaEl.currentTime = e.target.value/1000*mediaEl.duration;
+});
+$('#vol').addEventListener('input', function(e){
+  vol=parseFloat(e.target.value);
+  if(masterGain) masterGain.gain.value=vol;
+  mediaEl.volume=vol;
+});
+$('#rate').addEventListener('change', function(e){ mediaEl.playbackRate=parseFloat(e.target.value); });
+$('#loopBtn').addEventListener('click', function(){
+  this.classList.toggle('on'); mediaEl.loop=this.classList.contains('on');
+});
+$('#fsBtn').addEventListener('click', function(){
+  var el=$('#stage');
+  if(document.fullscreenElement||document.webkitFullscreenElement){
+    var ex=document.exitFullscreen||document.webkitExitFullscreen||document.webkitCancelFullScreen;
+    if(ex) try{ ex.call(document); }catch(e){}
+    return;
+  }
+  var fn = el.requestFullscreen||el.webkitRequestFullscreen||el.webkitRequestFullScreen||el.mozRequestFullScreen;
+  if(fn){ try{ fn.call(el); }catch(e){ showErr('进入全屏失败：'+e.message); } return; }
+  if(mediaEl.webkitEnterFullscreen){ mediaEl.webkitEnterFullscreen(); return; }  // iOS 视频
+  showErr('当前浏览器/环境不支持全屏。');
+});
+$('#fft').addEventListener('change', function(){
+  if(analyser){ analyser.fftSize=parseInt(this.value,10); peaks=null; specReady=false; }
+});
+$('#smooth').addEventListener('input', function(){ if(analyser) analyser.smoothingTimeConstant=parseFloat(this.value); });
+$('#gainv').addEventListener('input', function(){ gainV=parseFloat(this.value); });
+
+/* 可视化切换 */
+var vbtns = document.querySelectorAll('.vbtn');
+function setVis(v){
+  vis=v; peaks=null; specReady=false;
+  Array.prototype.forEach.call(vbtns, function(x){ x.classList.toggle('on', x.dataset.vis===v); });
+}
+Array.prototype.forEach.call(vbtns, function(b){
+  b.addEventListener('click', function(){ setVis(b.dataset.vis); });
+});
+canvas.addEventListener('click', function(){
+  var order=['wave','bars','radial','spec'];
+  setVis(order[(order.indexOf(vis)+1)%order.length]);
+});
+
+/* 屏幕常亮 */
+function requestWake(){
+  if(!navigator.wakeLock) return;
+  navigator.wakeLock.request('screen').then(function(s){
+    wakeLock=s; $('#wakeState').textContent='已保持常亮';
+    s.addEventListener && s.addEventListener('release', function(){ wakeLock=null; $('#wakeState').textContent=''; });
+  }).catch(function(){ $('#wakeState').textContent=''; });
+}
+function releaseWake(){
+  if(wakeLock){ try{ wakeLock.release(); }catch(e){} wakeLock=null; $('#wakeState').textContent=''; }
+}
+$('#wakeChk').addEventListener('change', function(){
+  if(this.checked){ if(!mediaEl.paused) requestWake(); }
+  else releaseWake();
+});
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden) releaseWake();
+  else if($('#wakeChk').checked && !mediaEl.paused) requestWake();
+});
+
+/* =========================================================
+   8. 绘图
+   ========================================================= */
+function resize(){
+  var dpr = Math.min(window.devicePixelRatio||1, DEV.isMobile?2:2);
+  var w=canvas.clientWidth, h=canvas.clientHeight;
+  canvas.width=Math.round(w*dpr); canvas.height=Math.round(h*dpr);
+  c2d.setTransform(dpr,0,0,dpr,0,0);
+  specReady=false;
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', function(){ setTimeout(resize, 300); });
+
+var tbuf=null, fbuf=null;
+function draw(){
+  raf = requestAnimationFrame(draw);
+  var W=canvas.clientWidth, H=canvas.clientHeight;
+  c2d.clearRect(0,0,W,H);
+  if(!analyser){ drawIdle(W,H); return; }
+
+  var n=analyser.fftSize;
+  if(!tbuf || tbuf.length!==n) tbuf=new Float32Array(n);
+  if(analyser.getFloatTimeDomainData) analyser.getFloatTimeDomainData(tbuf);
+  else {
+    if(!fbuf || fbuf.length!==n) fbuf=new Uint8Array(n);
+    analyser.getByteTimeDomainData(fbuf);
+    for(var q=0;q<n;q++) tbuf[q]=(fbuf[q]-128)/128;
+  }
+
+  var sum=0, pk=0;
+  for(var i=0;i<n;i++){ var v=tbuf[i]; sum+=v*v; var a=Math.abs(v); if(a>pk) pk=a; }
+  var rmsDb=toDb(Math.sqrt(sum/n)), pkDb=toDb(pk);
+  $('#rmsTxt').textContent = isFinite(rmsDb)? rmsDb.toFixed(1)+' dB' : '-∞ dB';
+  $('#peakTxt').textContent = isFinite(pkDb)? pkDb.toFixed(1)+' dB' : '-∞ dB';
+  $('#rmsBar').style.width = (dbToPct(rmsDb)*100)+'%';
+  $('#peakBar').style.width = (dbToPct(pkDb)*100)+'%';
+  if(pk>rmsPeak) rmsPeak=pk; else rmsPeak*=0.97;
+  $('#peakHold').style.left = 'calc('+(dbToPct(toDb(rmsPeak))*100)+'% - 1px)';
+
+  if(vis==='wave') drawWave(W,H);
+  else if(vis==='bars') drawBars(W,H);
+  else if(vis==='radial') drawRadial(W,H,Math.sqrt(sum/n));
+  else drawSpec(W,H);
+}
+function drawIdle(W,H){
+  c2d.strokeStyle='rgba(255,255,255,.10)'; c2d.lineWidth=2;
+  c2d.beginPath(); c2d.moveTo(0,H/2); c2d.lineTo(W,H/2); c2d.stroke();
+  c2d.fillStyle='rgba(139,154,184,.6)'; c2d.font='12px system-ui'; c2d.textAlign='center';
+  c2d.fillText('载入文件或开启麦克风后开始显示声波', W/2, H/2-14);
+}
+function drawWave(W,H){
+  var n=tbuf.length, mid=H/2, amp=H/2*0.92*Math.min(gainV/1.6,3);
+  var g=c2d.createLinearGradient(0,0,W,0);
+  g.addColorStop(0,'#22d3ee'); g.addColorStop(.5,'#a78bfa'); g.addColorStop(1,'#f472b6');
+  var x, idx, stepX = DEV.isMobile?3:2;
+  c2d.beginPath(); c2d.moveTo(0,mid);
+  for(x=0;x<=W;x+=stepX){ idx=Math.min(n-1,Math.floor(x/W*n)); c2d.lineTo(x, mid-tbuf[idx]*amp); }
+  c2d.lineTo(W,mid);
+  for(x=W;x>=0;x-=stepX){ idx=Math.min(n-1,Math.floor(x/W*n)); c2d.lineTo(x, mid+tbuf[idx]*amp); }
+  c2d.closePath();
+  var fill=c2d.createLinearGradient(0,0,0,H);
+  fill.addColorStop(0,'rgba(167,139,250,.22)'); fill.addColorStop(.5,'rgba(34,211,238,.30)'); fill.addColorStop(1,'rgba(244,114,182,.22)');
+  c2d.fillStyle=fill; c2d.fill();
+  c2d.beginPath();
+  for(x=0;x<=W;x++){ idx=Math.min(n-1,Math.floor(x/W*n)); var y=mid-tbuf[idx]*amp; if(x===0)c2d.moveTo(x,y); else c2d.lineTo(x,y); }
+  c2d.strokeStyle=g; c2d.lineWidth=2; c2d.lineJoin='round';
+  c2d.shadowColor='rgba(34,211,238,.55)'; c2d.shadowBlur=10; c2d.stroke(); c2d.shadowBlur=0;
+}
+function drawBars(W,H){
+  var binCount=analyser.frequencyBinCount;
+  if(!fbuf||fbuf.length!==binCount) fbuf=new Uint8Array(binCount);
+  analyser.getByteFrequencyData(fbuf);
+  var nBars=Math.max(20, Math.min(DEV.isMobile?56:96, Math.floor(W/9)));
+  if(!peaks||peaks.length!==nBars) peaks=new Float32Array(nBars);
+  var nyq=actx.sampleRate/2, fmin=25, fmax=Math.min(20000,nyq);
+  var bw=W/nBars, gap=Math.min(3,bw*0.22);
+  for(var i=0;i<nBars;i++){
+    var f0=fmin*Math.pow(fmax/fmin,i/nBars);
+    var f1=fmin*Math.pow(fmax/fmin,(i+1)/nBars);
+    var b0=Math.floor(f0/nyq*binCount);
+    var b1=Math.max(b0+1, Math.min(binCount, Math.ceil(f1/nyq*binCount)));
+    var m=0; for(var b=b0;b<b1;b++) if(fbuf[b]>m) m=fbuf[b];
+    var v=(m/255)*Math.min(gainV/1.6,2.2); v=Math.max(0,Math.min(1,v));
+    var h=v*H*0.88, x=i*bw;
+    var g=c2d.createLinearGradient(0,H,0,H-h);
+    g.addColorStop(0,'#22d3ee'); g.addColorStop(.6,'#a78bfa'); g.addColorStop(1,'#f472b6');
+    c2d.fillStyle=g; roundRect(x+gap/2,H-h,bw-gap,h,Math.min(3,bw*0.3)); c2d.fill();
+    peaks[i]=Math.max(h, peaks[i]-H*0.004);
+    c2d.fillStyle='rgba(255,255,255,.75)';
+    c2d.fillRect(x+gap/2, H-peaks[i]-2, bw-gap, 2);
+  }
+  c2d.fillStyle='rgba(139,154,184,.55)'; c2d.font='10px system-ui'; c2d.textAlign='left';
+  [100,1000,10000].forEach(function(f){
+    if(f>nyq) return;
+    var pos=Math.log(f/fmin)/Math.log(fmax/fmin)*W;
+    c2d.fillText(f>=1000?(f/1000)+'k':''+f, pos+2, H-4);
+  });
+}
+function roundRect(x,y,w,h,r){
+  if(w<=0||h<=0) return;
+  r=Math.min(r,w/2,h/2);
+  c2d.beginPath();
+  c2d.moveTo(x+r,y); c2d.lineTo(x+w-r,y); c2d.quadraticCurveTo(x+w,y,x+w,y+r);
+  c2d.lineTo(x+w,y+h-r); c2d.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  c2d.lineTo(x+r,y+h); c2d.quadraticCurveTo(x,y+h,x,y+h-r);
+  c2d.lineTo(x,y+r); c2d.quadraticCurveTo(x,y,x+r,y); c2d.closePath();
+}
+function drawRadial(W,H,rms){
+  var binCount=analyser.frequencyBinCount;
+  if(!fbuf||fbuf.length!==binCount) fbuf=new Uint8Array(binCount);
+  analyser.getByteFrequencyData(fbuf);
+  var cx=W/2, cy=H/2, R0=Math.min(W,H)*0.16*(1+rms*1.6), R1=Math.min(W,H)*0.46;
+  var nBars=DEV.isMobile?60:90, nyq=actx.sampleRate/2, fmin=30, fmax=Math.min(16000,nyq);
+  for(var i=0;i<nBars;i++){
+    var a=i/nBars*Math.PI*2-Math.PI/2;
+    var f0=fmin*Math.pow(fmax/fmin,i/nBars);
+    var b0=Math.floor(f0/nyq*binCount);
+    var b1=Math.max(b0+1, Math.min(binCount, Math.ceil(fmin*Math.pow(fmax/fmin,(i+1)/nBars)/nyq*binCount)));
+    var m=0; for(var b=b0;b<b1;b++) if(fbuf[b]>m) m=fbuf[b];
+    var v=(m/255)*Math.min(gainV/1.6,2.2);
+    var len=(R1-R0)*v;
+    var x1=cx+Math.cos(a)*R0, y1=cy+Math.sin(a)*R0;
+    var x2=cx+Math.cos(a)*(R0+len), y2=cy+Math.sin(a)*(R0+len);
+    var g=c2d.createLinearGradient(x1,y1,x2,y2);
+    g.addColorStop(0,'#22d3ee'); g.addColorStop(1,'#f472b6');
+    c2d.strokeStyle=g; c2d.lineWidth=Math.max(2,(Math.PI*2*R0/nBars)*0.62); c2d.lineCap='round';
+    c2d.beginPath(); c2d.moveTo(x1,y1); c2d.lineTo(x2,y2); c2d.stroke();
+  }
+  var g2=c2d.createRadialGradient(cx,cy,0,cx,cy,R0);
+  g2.addColorStop(0,'rgba(167,139,250,.55)'); g2.addColorStop(1,'rgba(34,211,238,.06)');
+  c2d.fillStyle=g2; c2d.beginPath(); c2d.arc(cx,cy,R0,0,Math.PI*2); c2d.fill();
+  c2d.strokeStyle='rgba(255,255,255,.35)'; c2d.lineWidth=1.5; c2d.stroke();
+  c2d.beginPath();
+  var n=tbuf.length, K=DEV.isMobile?120:180, sa=Math.PI*2/K;
+  for(var k=0;k<=K;k++){
+    var idx=Math.floor(k/K*n);
+    var rr=R0*0.86 + tbuf[idx]*R0*0.5*Math.min(gainV/1.6,2.5);
+    var aa=k*sa-Math.PI/2;
+    var xx=cx+Math.cos(aa)*rr, yy=cy+Math.sin(aa)*rr;
+    if(k===0)c2d.moveTo(xx,yy); else c2d.lineTo(xx,yy);
+  }
+  c2d.closePath(); c2d.strokeStyle='rgba(255,255,255,.85)'; c2d.lineWidth=1.6; c2d.stroke();
+}
+function drawSpec(W,H){
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  if(!spec){ spec=document.createElement('canvas'); specCtx=spec.getContext('2d'); }
+  if(!specReady || spec.width!==Math.round(W*dpr) || spec.height!==Math.round(H*dpr)){
+    spec.width=Math.round(W*dpr); spec.height=Math.round(H*dpr);
+    specCtx.fillStyle='#05080f'; specCtx.fillRect(0,0,spec.width,spec.height);
+    specReady=true;
+  }
+  var sw=spec.width, sh=spec.height;
+  specCtx.globalCompositeOperation='copy';
+  specCtx.drawImage(spec,-dpr,0);
+  specCtx.globalCompositeOperation='source-over';
+  var binCount=analyser.frequencyBinCount;
+  if(!fbuf||fbuf.length!==binCount) fbuf=new Uint8Array(binCount);
+  analyser.getByteFrequencyData(fbuf);
+  var nyq=actx.sampleRate/2, fmin=30, fmax=Math.min(20000,nyq);
+  var colW=dpr, rows = DEV.isMobile?2:1;
+  for(var y=0;y<sh;y+=rows){
+    var t=1-y/sh;
+    var f=fmin*Math.pow(fmax/fmin,t);
+    var bi=Math.max(0,Math.min(binCount-1,Math.round(f/nyq*binCount)));
+    var v=Math.min(1,(fbuf[bi]/255)*Math.min(gainV/1.6,2));
+    var hue=250-v*250;
+    specCtx.fillStyle='hsl('+hue+','+(70+v*25)+'%,'+(4+v*58)+'%)';
+    specCtx.fillRect(sw-colW, y, colW, rows);
+  }
+  c2d.drawImage(spec,0,0,W,H);
+}
+
+/* =========================================================
+   9. 麦克风
+   ========================================================= */
+function setMode(m){
+  mode=m;
+  $('#tabFile').classList.toggle('on', m==='file');
+  $('#tabMic').classList.toggle('on', m==='mic');
+  $('#fileCard').classList.toggle('hidden', m!=='file');
+  $('#micCard').classList.toggle('hidden', m!=='mic');
+  if(m==='file' && micStream) stopMic();
+}
+$('#tabFile').addEventListener('click', function(){ setMode('file'); });
+$('#tabMic').addEventListener('click', function(){ setMode('mic'); });
+
+$('#micBtn').addEventListener('click', function(){
+  if(micStream){ stopMic(); return; }
+  if(!ensureAudio()) return;
+  resumeAudio();
+  var gum = (navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+    ? function(c){ return navigator.mediaDevices.getUserMedia(c); }
+    : (navigator.getUserMedia ? function(c){ return new Promise(function(res,rej){ navigator.getUserMedia(c,res,rej); }); }
+    : (navigator.webkitGetUserMedia ? function(c){ return new Promise(function(res,rej){ navigator.webkitGetUserMedia(c,res,rej); }); } : null));
+
+  if(!gum){
+    showMicErr('当前浏览器不支持麦克风采集。建议使用 Chrome / Edge / Safari，并在 https 或本地文件环境打开。'); return;
+  }
+  if(!DEV.secure){
+    showMicErr('当前页面不是安全上下文（'+location.protocol+'），浏览器已禁用麦克风。请把本文件放到 https 环境，或在电脑上以本地文件方式打开。'); return;
+  }
+  gum.call(navigator.mediaDevices||navigator, {audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})
+  .then(function(st){
+    micStream=st;
+    micSrc=actx.createMediaStreamSource(st);
+    try{ analyser.disconnect(); }catch(e){}
+    micSrc.connect(analyser);
+    $('#micBtn').innerHTML='■ 关闭麦克风';
+    $('#micBtn').classList.add('rec-on');
+    $('#recBtn').disabled = !DEV.cap.recorder;
+    $('#micErr').classList.add('hidden');
+    $('#ph').classList.remove('hidden');
+    $('#phTxt').textContent='麦克风实时输入中 · '+fmtSr();
+    $('#iName').textContent='麦克风（实时流）';
+    $('#iFmt').textContent='MediaStream / 实时采集';
+    $('#iExt').innerHTML='<span class="tag mut">实时源</span>';
+    $('#iSize').textContent='不适用';
+    $('#iDur').textContent='实时（无限）';
+    $('#iRes').innerHTML='<span class="tag mut">无视频轨</span>';
+    $('#iFps').textContent='—'; $('#iBitrate').textContent='—'; $('#iHex').textContent='—';
+    $('#iSr').textContent=fmtSr();
+    var tr=st.getAudioTracks()[0];
+    var ch = tr && tr.getSettings ? tr.getSettings().channelCount : null;
+    $('#iCh').textContent = ch ? chName(ch) : chName(1);
+  })
+  .catch(function(e){
+    var msg = e && e.name==='NotAllowedError' ? '麦克风权限被拒绝。请在浏览器地址栏的权限设置里允许麦克风后重试。'
+      : e && e.name==='NotFoundError' ? '未检测到麦克风设备。'
+      : e && e.name==='NotReadableError' ? '麦克风被其他程序占用，请关闭后重试。'
+      : ((e && (e.message||e.name)) || '未知错误');
+    showMicErr(msg + (DEV.isIOS?'（iOS 需在 Safari 中允许，且不能用微信内置浏览器。）':''));
+  });
+});
+function fmtSr(){ var a=ensureAudio(); return a ? a.sampleRate+' Hz' : '—'; }
+function stopMic(){
+  if(recorder && recorder.state!=='inactive'){ try{ recorder.stop(); }catch(e){} }
+  if(micSrc){ try{ micSrc.disconnect(); }catch(e){} micSrc=null; }
+  if(micStream){ micStream.getTracks().forEach(function(t){ t.stop(); }); micStream=null; }
+  if(analyser&&masterGain){ try{ analyser.connect(masterGain); }catch(e){} }
+  $('#micBtn').innerHTML='开启麦克风';
+  $('#micBtn').classList.remove('rec-on');
+  $('#recBtn').disabled=true;
+  $('#recBtn').innerHTML='● 开始录音';
+  $('#recTime').textContent='';
+}
+
+/* 录音 */
+$('#recBtn').addEventListener('click', function(){
+  if(!micStream) return;
+  if(recorder && recorder.state==='recording'){ recorder.stop(); return; }
+  var mime='';
+  var cand=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4','audio/mpeg'];
+  for(var i=0;i<cand.length;i++){
+    if(window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(cand[i])){ mime=cand[i]; break; }
+  }
+  try{ recorder = new MediaRecorder(micStream, mime?{mimeType:mime}:undefined); }
+  catch(e){ showMicErr('当前浏览器不支持录音（MediaRecorder）。'); return; }
+  recChunks=[];
+  recorder.ondataavailable=function(e){ if(e.data&&e.data.size) recChunks.push(e.data); };
+  recorder.onstop=function(){
+    clearInterval(recTimer);
+    $('#recBtn').innerHTML='● 开始录音';
+    var type=recorder.mimeType||'audio/webm';
+    var blob=new Blob(recChunks,{type:type});
+    var ext = type.indexOf('mp4')>=0?'m4a':(type.indexOf('ogg')>=0?'ogg':'webm');
+    var f;
+    try{
+      f=new File([blob], '录音_'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+'.'+ext, {type:type});
+    }catch(e){ f=blob; f.name='录音.'+ext; }
+    $('#recTime').textContent='已录制 '+fmtBytes(blob.size)+' · 已载入分析';
+    setMode('file'); loadFile(f);
+  };
+  try{ recorder.start(); }
+  catch(e){ showMicErr('录音启动失败：'+e.message); return; }
+  recT0=Date.now();
+  $('#recBtn').innerHTML='■ 停止并载入';
+  $('#recTime').textContent='录音中 0:00';
+  clearInterval(recTimer);
+  recTimer=setInterval(function(){ $('#recTime').textContent='录音中 '+fmtTime((Date.now()-recT0)/1000); },250);
+});
+
+/* =========================================================
+   10. 文件选择（移动端 / 桌面端通用）
+   ========================================================= */
+var fileInput=$('#fileInput'), drop=$('#drop');
+fileInput.addEventListener('change', function(e){
+  var f=e.target.files && e.target.files[0];
+  if(f){ gotFile=true; hideHint(); loadFile(f); }
+  setTimeout(function(){ try{ fileInput.value=''; }catch(err){} }, 900);
+});
+fileInput.addEventListener('click', function(){
+  gotFile=false; clearTimeout(probeTimer);
+  probeTimer=setTimeout(function(){
+    if(!gotFile && document.hasFocus()){
+      showHint('当前环境似乎拦住了文件选择器。请依次尝试：① 点右上角「⋯」→ 用系统浏览器打开；② 把文件拖进虚线框（电脑）；③ 复制文件后按 Ctrl / ⌘ + V 粘贴。');
+    }
+  }, 2400);
+});
+$('#pickerBtn').addEventListener('click', function(e){
+  e.preventDefault(); e.stopPropagation();
+  if(fileInput.showPicker){ try{ fileInput.showPicker(); return; }catch(err){} }
+  fileInput.click();
+});
+['dragenter','dragover'].forEach(function(ev){
+  drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add('over'); });
+});
+['dragleave','drop'].forEach(function(ev){
+  drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove('over'); });
+});
+drop.addEventListener('drop', function(e){
+  if(e.target && e.target.id==='fileInput'){ e.preventDefault(); return; }
+  var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f){ gotFile=true; hideHint(); loadFile(f); }
+});
+window.addEventListener('paste', function(e){
+  if(e.clipboardData && e.clipboardData.files && e.clipboardData.files[0]) loadFile(e.clipboardData.files[0]);
+});
+
+function showErr(m){ var el=$('#err'); el.textContent=m; el.classList.remove('hidden'); }
+function hideErr(){ $('#err').classList.add('hidden'); }
+function showHint(m){ var el=$('#hint'); el.textContent=m; el.classList.remove('hidden'); }
+function hideHint(){ $('#hint').classList.add('hidden'); }
+function showMicErr(m){ var el=$('#micErr'); el.textContent=m; el.classList.remove('hidden'); }
+
+/* =========================================================
+   11. 快捷键（桌面）
+   ========================================================= */
+window.addEventListener('keydown', function(e){
+  if(/input|select|textarea/i.test(e.target.tagName)) return;
+  if(e.code==='Space'){ e.preventDefault(); $('#playBtn').click(); }
+  else if(e.code==='ArrowLeft'){ mediaEl.currentTime=Math.max(0,mediaEl.currentTime-5); }
+  else if(e.code==='ArrowRight'){ mediaEl.currentTime=Math.min(mediaEl.duration||0,mediaEl.currentTime+5); }
+  else if(['1','2','3','4'].indexOf(e.key)>=0){
+    var b=vbtns[parseInt(e.key,10)-1]; if(b) b.click();
+  }
+});
+
+/* =========================================================
+   12. 诊断复制
+   ========================================================= */
+$('#copyBtn').addEventListener('click', function(){
+  var lines=[
+    '【设备】'+DEV.devType+' / '+DEV.device,
+    '【系统】'+DEV.os+' '+(DEV.osVer||''),
+    '【浏览器】'+DEV.browser+' '+(DEV.bver||'')+' · 引擎 '+DEV.engine,
+    '【环境】'+(DEV.inApp?('App 内置浏览器 '+DEV.inApp.name+' '+(DEV.inApp.ver||'')):'独立浏览器')+' · '+location.protocol+(DEV.secure?'（安全上下文）':'（非安全上下文）'),
+    '【屏幕】'+screen.width+'×'+screen.height+' DPR '+(window.devicePixelRatio||1)+' 触控 '+(navigator.maxTouchPoints||0),
+    '【能力】WebAudio='+DEV.cap.webaudio+' 麦克风='+DEV.cap.gum+' 录音='+DEV.cap.recorder+' 全屏='+DEV.cap.fullscreen+' 常亮='+DEV.cap.wake,
+    '【UA】'+DEV.ua
+  ];
+  var txt=lines.join('\n');
+  var btn=this, old=btn.textContent;
+  function done(ok){
+    btn.textContent = ok ? '✓ 已复制，可直接粘贴发送' : '复制失败，请长按下方文字手动复制';
+    setTimeout(function(){ btn.textContent=old; }, 2200);
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(function(){ done(true); }, function(){ fallbackCopy(txt,done); });
+  } else fallbackCopy(txt,done);
+});
+function fallbackCopy(txt,done){
+  try{
+    var ta=document.createElement('textarea');
+    ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0,txt.length);
+    var ok=document.execCommand('copy');
+    document.body.removeChild(ta); done(ok);
+  }catch(e){ done(false); }
+}
+
+/* =========================================================
+   13. 启动：按设备自动优化
+   ========================================================= */
+function boot(){
+  renderDevice();
+  renderCaps();
+
+  // 文案按设备调整
+  $('#dropSub').innerHTML = DEV.isMobile
+    ? '从「文件」或「照片图库」中选择 MP3 / MP4 / M4A / WAV<br>按文件头识别真实格式，改名成 .mp3 的 MP4 也能播视频'
+    : '也可把文件拖进这里，或按 Ctrl / ⌘ + V 粘贴<br>支持 MP3 / MP4 / M4A / WAV / OGG / FLAC / WEBM / MOV<br>按文件头识别真实格式，改名成 .mp3 的 MP4 也能播视频';
+  $('#dropBig').textContent = DEV.isMobile ? '点击这里选择文件' : '点击这里选择文件';
+
+  // 环境提示
+  var el=$('#env'), inFrame=false;
+  try{ inFrame = window.self!==window.top; }catch(e){ inFrame=true; }
+  if(DEV.inApp){
+    el.innerHTML='<b>检测到 '+DEV.inApp.name+' 内置浏览器。</b>它可能禁用文件选择与麦克风。若点击无反应，请点右上角「⋯」→ <b>用系统浏览器打开</b>（iPhone 用 Safari，安卓用 Chrome），再重新打开本文件。';
+    el.classList.remove('hidden');
+  } else if(inFrame){
+    el.innerHTML='<b>当前页面嵌在框架内。</b>预览器可能拦截文件选择，建议在系统浏览器中直接打开本文件。';
+    el.classList.remove('hidden');
+  } else if(!DEV.secure && DEV.cap.gum){
+    el.innerHTML='<b>非安全上下文（'+location.protocol+'）。</b>麦克风功能将被浏览器禁用，文件分析不受影响。';
+    el.classList.remove('hidden');
+  }
+
+  // 麦克风环境提示
+  if(DEV.isIOS){
+    $('#micNote').textContent='iOS 注意：必须在 Safari 中打开（微信/QQ 内置浏览器无法授权），首次开启需点「允许」。';
+    $('#micNote').style.display='block';
+  } else if(!DEV.secure){
+    $('#micNote').textContent='当前环境不安全（非 https），麦克风大概率会被拒绝。';
+    $('#micNote').style.display='block';
+  }
+
+  // 移动端自动优化：默认频谱柱 + FFT 1024
+  if(DEV.isMobile){
+    setVis('bars');
+    $('#fft').value='1024';
+    $('#visMore').textContent='点画面可切换模式';
+  }
+  if(!DEV.cap.wake){ $('#wakeChk').disabled=true; $('#fsTxt').textContent=''; }
+  if(!fileInput.showPicker) $('#noPicker').classList.remove('hidden');
+
+  resize();
+  mediaEl.volume=vol;
+  if(!raf) raf=requestAnimationFrame(draw);
+}
+boot();
+})();
+</script>
+</body>
+</html>
